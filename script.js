@@ -33,20 +33,41 @@ function showSection(id) {
     }
 }
 
-function toggleModal(id) {
-    const m = document.getElementById(id);
-    m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
-}
-
-// AUTH
+// AUTH LOGIC
 async function handleLogin() {
     const email = document.getElementById('login-email').value;
     const pass = document.getElementById('login-pass').value;
     try {
         await auth.signInWithEmailAndPassword(email, pass);
-        toggleModal('login-modal');
-    } catch (e) { alert(e.message); }
+    } catch (e) { 
+        alert("Login Failed: " + e.message); 
+    }
 }
+
+auth.onAuthStateChanged(user => {
+    const loginScreen = document.getElementById('login-screen');
+    const dashboard = document.getElementById('main-dashboard');
+    const authStatus = document.getElementById('auth-status');
+    const adminUI = document.querySelectorAll('.admin-only');
+
+    if (user) {
+        loginScreen.classList.add('hidden');
+        dashboard.classList.remove('hidden');
+        authStatus.innerHTML = `<span style="font-size:0.8rem; margin-right:10px;">${user.email}</span><button onclick="auth.signOut()">Logout</button>`;
+        
+        if (user.email === ADMIN_EMAIL) {
+            adminUI.forEach(el => el.classList.remove('hidden'));
+        } else {
+            adminUI.forEach(el => el.classList.add('hidden'));
+        }
+        
+        // Initial data loads
+        loadRoster(); loadFinance(); loadWeed(); loadMats(); loadMatThreads(); loadLogs();
+    } else {
+        loginScreen.classList.remove('hidden');
+        dashboard.classList.add('hidden');
+    }
+});
 
 // ROSTER
 async function registerMember() {
@@ -215,9 +236,49 @@ function loadMats() {
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
-            list.innerHTML += `<tr><td>${d.name}</td><td>${d.qty}</td><td>${d.loc}</td><td>${d.updated.toDate().toLocaleString()}</td></tr>`;
+            const isKaizo = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+            list.innerHTML += `<tr>
+                <td>${d.name}</td><td>${d.qty}</td><td>${d.loc}</td>
+                <td>${isKaizo ? `<button onclick="deleteDoc('materials', '${doc.id}')" style="background:red;">X</button>` : ''}</td>
+            </tr>`;
         });
     });
+}
+
+async function createMatThread() {
+    const item = document.getElementById('thread-item').value;
+    if(!item) return;
+    await db.collection('mat_threads').add({ item, claimedBy: null, postedAt: new Date() });
+    document.getElementById('thread-item').value = '';
+}
+
+function loadMatThreads() {
+    db.collection('mat_threads').orderBy('postedAt', 'desc').onSnapshot(snap => {
+        const container = document.getElementById('mats-threads-container');
+        container.innerHTML = '';
+        snap.forEach(doc => {
+            const d = doc.data();
+            const isKaizo = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+            const isClaimed = d.claimedBy !== null;
+            container.innerHTML += `
+                <div class="thread-card ${isClaimed ? 'claimed' : ''}">
+                    <h4 style="margin:0;">${d.item}</h4>
+                    <p style="font-size:0.8rem; color:#888;">${isClaimed ? `Claimed by: ${d.claimedBy}` : 'Unclaimed'}</p>
+                    ${!isClaimed ? `<button onclick="claimThread('${doc.id}')" style="background:green; font-size:0.7rem; margin-top:5px;">Claim It</button>` : ''}
+                    ${isKaizo ? `<button onclick="deleteDoc('mat_threads', '${doc.id}')" style="background:red; font-size:0.7rem; margin-top:5px; margin-left:5px;">Delete</button>` : ''}
+                </div>
+            `;
+        });
+    });
+}
+
+async function claimThread(id) {
+    if(!auth.currentUser) return;
+    await db.collection('mat_threads').doc(id).update({ claimedBy: auth.currentUser.email });
+}
+
+async function deleteDoc(col, id) {
+    if(confirm("Delete this?")) await db.collection(col).doc(id).delete();
 }
 
 // LOGS
@@ -242,16 +303,3 @@ function filterLogs() {
         row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none';
     });
 }
-
-auth.onAuthStateChanged(user => {
-    const adminUI = document.querySelectorAll('.admin-only');
-    if (user) {
-        document.getElementById('auth-status').innerHTML = `<button onclick="auth.signOut()">Logout</button>`;
-        if (user.email === ADMIN_EMAIL) adminUI.forEach(el => el.classList.remove('hidden'));
-    } else {
-        document.getElementById('auth-status').innerHTML = `<button onclick="toggleModal('login-modal')">Login</button>`;
-        adminUI.forEach(el => el.classList.add('hidden'));
-    }
-});
-
-loadRoster(); loadFinance(); loadWeed(); loadMats(); loadLogs();
