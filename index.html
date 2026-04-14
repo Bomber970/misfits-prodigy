@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MISFITS | Gang Management</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">
+            <img src="logo.png" alt="Misfits Logo">
+            <span>MISFITS</span>
+        </div>
+        <div id="auth-status">
+            <button id="login-btn" onclick="toggleModal('login-modal')">Login</button>
+        </div>
+    </nav>
+
+    <div class="sidebar">
+        <button onclick="showSection('roster-sec')">Roster</button>
+        <button onclick="showSection('finance-sec')">Finance (ID: 155797)</button>
+        <button onclick="showSection('history-sec')">Payment History</button>
+        <button onclick="showSection('weed-sec')">Weed Lab</button>
+        <button onclick="showSection('mats-sec')">Materials</button>
+        <button onclick="showSection('logs-sec')">Activity Log</button>
+    </div>
+
+    <main id="content">
+        <section id="roster-sec" class="tab-content">
+            <h2>Gang Roster</h2>
+            <div id="admin-add-member" class="admin-only hidden">
+                <div class="admin-box">
+                    <h3>Add New Member</h3>
+                    <div class="form-grid">
+                        <input type="text" id="new-name" placeholder="In-game Name">
+                        <input type="email" id="new-email" placeholder="Email (Login)">
+                        <input type="password" id="new-pass" placeholder="Password">
+                        <input type="text" id="new-phone" placeholder="Phone Number">
+                        <select id="new-rank">
+                            <option value="hangarround">hangarround</option>
+                            <option value="member">member</option>
+                            <option value="enforcer">enforcer</option>
+                            <option value="captain">captain</option>
+                            <option value="OG">OG</option>
+                            <option value="underboss">underboss</option>
+                            <option value="boss">boss</option>
+                        </select>
+                        <button onclick="registerMember()">Create Member</button>
+                    </div>
+                </div>
+            </div>
+            <div id="roster-list" class="grid"></div>
+        </section>
+
+        <section id="finance-sec" class="tab-content hidden">
+            <h2>Current Week Finance</h2>
+            <div class="stats-row">
+                <div class="stat-card">Weekly Due: $5,000</div>
+                <div class="stat-card">Account ID: 155797</div>
+                <button id="reset-week-btn" class="admin-only hidden" onclick="resetFinanceWeek()" style="background: #e67e22;">RESET FOR NEW WEEK</button>
+            </div>
+            
+            <div class="payment-zone">
+                <h3>Submit My Payment</h3>
+                <input type="text" id="proof-link" placeholder="Proof Link (Imgur/Discord)">
+                <button onclick="submitPayment()">Submit Proof</button>
+            </div>
+
+            <div class="admin-only hidden">
+                <h3>Verification (Current Week)</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Member</th>
+                                <th>Due</th>
+                                <th>Proof</th>
+                                <th>Status</th>
+                                <th>Date Submitted</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payment-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="history-sec" class="tab-content hidden">
+            <h2>Payment History Archives</h2>
+            <div class="stats-row">
+                <div class="stat-card" style="background: #333;">Current Calendar Week: <span id="current-week-display" style="color: var(--primary-blue);">--</span></div>
+            </div>
+            <div class="admin-box">
+                <label>Search Week Number:</label>
+                <input type="number" id="history-week-select" min="1" max="53">
+                <button onclick="loadHistoryByWeek()">Search History</button>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Member</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+                    </thead>
+                    <tbody id="history-list"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="weed-sec" class="tab-content hidden">
+            <h2>Weed Lab Management</h2>
+            <div class="admin-box">
+                <h3>Log New Batch / Sale</h3>
+                <div class="form-grid">
+                    <select id="weed-strain"><option>Outcast OG</option><option>MSFuego</option></select>
+                    <input type="text" id="weed-zone" placeholder="Addiction Zone">
+                    <input type="number" id="weed-amount" placeholder="Amount">
+                    <select id="weed-lace">
+                        <option value="None">None</option>
+                        <option value="Coke">Coke</option>
+                        <option value="Meth">Meth</option>
+                        <option value="Pills">Pills</option>
+                    </select>
+                    <input type="text" id="weed-buyer" placeholder="Buyer Name">
+                    <button onclick="logWeed('produced')">Log Production</button>
+                    <button onclick="logWeed('sold')" style="background: #27ae60;">Log Sale</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Strain</th><th>Zone</th><th>Amount</th><th>Laced</th><th>Buyer</th><th>Date</th></tr>
+                    </thead>
+                    <tbody id="weed-list"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="mats-sec" class="tab-content hidden">
+            <h2>Material Management</h2>
+            <div class="admin-box">
+                <h3>Update Stock</h3>
+                <div class="form-grid">
+                    <input type="text" id="mat-name" placeholder="Material Type">
+                    <input type="number" id="mat-qty" placeholder="Quantity">
+                    <input type="text" id="mat-loc" placeholder="House Location">
+                    <button onclick="updateMaterials()">Update Stock</button>
+                </div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Material</th><th>Quantity</th><th>Location</th><th>Last Updated</th></tr></thead>
+                    <tbody id="mats-list"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="logs-sec" class="tab-content hidden">
+            <h2>Activity Log</h2>
+            <input type="text" id="log-search" onkeyup="filterLogs()" placeholder="Search logs...">
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>User</th><th>Action</th><th>Date</th></tr></thead>
+                    <tbody id="log-list"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <h3>Login</h3>
+            <input type="email" id="login-email" placeholder="Email">
+            <input type="password" id="login-pass" placeholder="Password">
+            <button onclick="handleLogin()">Sign In</button>
+            <button onclick="toggleModal('login-modal')" style="background:#444;">Cancel</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
