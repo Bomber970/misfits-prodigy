@@ -51,9 +51,9 @@ auth.onAuthStateChanged(user => {
     const adminUI = document.querySelectorAll('.admin-only');
 
     if (user) {
-        loginScreen.classList.add('hidden');
-        dashboard.classList.remove('hidden');
-        authStatus.innerHTML = `<span style="font-size:0.8rem; margin-right:10px;">${user.email}</span><button onclick="auth.signOut()">Logout</button>`;
+        if(loginScreen) loginScreen.classList.add('hidden');
+        if(dashboard) dashboard.classList.remove('hidden');
+        if(authStatus) authStatus.innerHTML = `<span style="font-size:0.8rem; margin-right:10px;">${user.email}</span><button onclick="auth.signOut()">Logout</button>`;
         
         if (user.email === ADMIN_EMAIL) {
             adminUI.forEach(el => el.classList.remove('hidden'));
@@ -61,11 +61,10 @@ auth.onAuthStateChanged(user => {
             adminUI.forEach(el => el.classList.add('hidden'));
         }
         
-        // Initial data loads
         loadRoster(); loadFinance(); loadWeed(); loadMats(); loadMatThreads(); loadLogs();
     } else {
-        loginScreen.classList.remove('hidden');
-        dashboard.classList.add('hidden');
+        if(loginScreen) loginScreen.classList.remove('hidden');
+        if(dashboard) dashboard.classList.add('hidden');
     }
 });
 
@@ -91,6 +90,7 @@ async function registerMember() {
 function loadRoster() {
     db.collection('members').onSnapshot(snap => {
         const container = document.getElementById('roster-list');
+        if(!container) return;
         container.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -136,6 +136,7 @@ function loadFinance() {
     const currentWeek = getWeekNumber();
     db.collection('members').where('weekNumber', '==', currentWeek).onSnapshot(snap => {
         const list = document.getElementById('payment-list');
+        if(!list) return;
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -188,6 +189,7 @@ async function loadHistoryByWeek() {
     const week = parseInt(document.getElementById('history-week-select').value);
     const snap = await db.collection('members').where('weekNumber', '==', week).get();
     const list = document.getElementById('history-list');
+    if(!list) return;
     list.innerHTML = '';
     snap.forEach(doc => {
         const d = doc.data();
@@ -212,6 +214,7 @@ async function logWeed(type) {
 function loadWeed() {
     db.collection('weed_logs').orderBy('date', 'desc').onSnapshot(snap => {
         const list = document.getElementById('weed-list');
+        if(!list) return;
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -233,6 +236,7 @@ async function updateMaterials() {
 function loadMats() {
     db.collection('materials').orderBy('updated', 'desc').onSnapshot(snap => {
         const list = document.getElementById('mats-list');
+        if(!list) return;
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -255,6 +259,7 @@ async function createMatThread() {
 function loadMatThreads() {
     db.collection('mat_threads').orderBy('postedAt', 'desc').onSnapshot(snap => {
         const container = document.getElementById('mats-threads-container');
+        if(!container) return;
         container.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -281,7 +286,6 @@ async function deleteDoc(col, id) {
     if(confirm("Delete this?")) await db.collection(col).doc(id).delete();
 }
 
-// LOGS
 async function addLog(action) {
     await db.collection('logs').add({ user: auth.currentUser ? auth.currentUser.email : "System", action, date: new Date() });
 }
@@ -289,6 +293,7 @@ async function addLog(action) {
 function loadLogs() {
     db.collection('logs').orderBy('date', 'desc').limit(50).onSnapshot(snap => {
         const list = document.getElementById('log-list');
+        if(!list) return;
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
