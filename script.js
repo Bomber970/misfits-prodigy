@@ -33,40 +33,20 @@ function showSection(id) {
     }
 }
 
-// AUTH LOGIC
+function toggleModal(id) {
+    const m = document.getElementById(id);
+    m.style.display = (m.style.display === 'flex') ? 'none' : 'flex';
+}
+
+// AUTH
 async function handleLogin() {
     const email = document.getElementById('login-email').value;
     const pass = document.getElementById('login-pass').value;
     try {
         await auth.signInWithEmailAndPassword(email, pass);
-    } catch (e) { 
-        alert("Login Failed: " + e.message); 
-    }
+        toggleModal('login-modal');
+    } catch (e) { alert(e.message); }
 }
-
-auth.onAuthStateChanged(user => {
-    const loginScreen = document.getElementById('login-screen');
-    const dashboard = document.getElementById('main-dashboard');
-    const authStatus = document.getElementById('auth-status');
-    const adminUI = document.querySelectorAll('.admin-only');
-
-    if (user) {
-        if(loginScreen) loginScreen.classList.add('hidden');
-        if(dashboard) dashboard.classList.remove('hidden');
-        if(authStatus) authStatus.innerHTML = `<span style="font-size:0.8rem; margin-right:10px;">${user.email}</span><button onclick="auth.signOut()">Logout</button>`;
-        
-        if (user.email === ADMIN_EMAIL) {
-            adminUI.forEach(el => el.classList.remove('hidden'));
-        } else {
-            adminUI.forEach(el => el.classList.add('hidden'));
-        }
-        
-        loadRoster(); loadFinance(); loadWeed(); loadMats(); loadMatThreads(); loadLogs();
-    } else {
-        if(loginScreen) loginScreen.classList.remove('hidden');
-        if(dashboard) dashboard.classList.add('hidden');
-    }
-});
 
 // ROSTER
 async function registerMember() {
@@ -90,7 +70,6 @@ async function registerMember() {
 function loadRoster() {
     db.collection('members').onSnapshot(snap => {
         const container = document.getElementById('roster-list');
-        if(!container) return;
         container.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -136,7 +115,6 @@ function loadFinance() {
     const currentWeek = getWeekNumber();
     db.collection('members').where('weekNumber', '==', currentWeek).onSnapshot(snap => {
         const list = document.getElementById('payment-list');
-        if(!list) return;
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -189,7 +167,6 @@ async function loadHistoryByWeek() {
     const week = parseInt(document.getElementById('history-week-select').value);
     const snap = await db.collection('members').where('weekNumber', '==', week).get();
     const list = document.getElementById('history-list');
-    if(!list) return;
     list.innerHTML = '';
     snap.forEach(doc => {
         const d = doc.data();
@@ -214,7 +191,6 @@ async function logWeed(type) {
 function loadWeed() {
     db.collection('weed_logs').orderBy('date', 'desc').onSnapshot(snap => {
         const list = document.getElementById('weed-list');
-        if(!list) return;
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -236,7 +212,6 @@ async function updateMaterials() {
 function loadMats() {
     db.collection('materials').orderBy('updated', 'desc').onSnapshot(snap => {
         const list = document.getElementById('mats-list');
-        if(!list) return;
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -249,22 +224,27 @@ function loadMats() {
     });
 }
 
+// THREAD SYSTEM
 async function createMatThread() {
     const item = document.getElementById('thread-item').value;
     if(!item) return;
-    await db.collection('mat_threads').add({ item, claimedBy: null, postedAt: new Date() });
+    await db.collection('mat_threads').add({
+        item,
+        claimedBy: null,
+        postedAt: new Date()
+    });
     document.getElementById('thread-item').value = '';
 }
 
 function loadMatThreads() {
     db.collection('mat_threads').orderBy('postedAt', 'desc').onSnapshot(snap => {
         const container = document.getElementById('mats-threads-container');
-        if(!container) return;
         container.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
             const isKaizo = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
             const isClaimed = d.claimedBy !== null;
+            
             container.innerHTML += `
                 <div class="thread-card ${isClaimed ? 'claimed' : ''}">
                     <h4 style="margin:0;">${d.item}</h4>
@@ -278,14 +258,20 @@ function loadMatThreads() {
 }
 
 async function claimThread(id) {
-    if(!auth.currentUser) return;
-    await db.collection('mat_threads').doc(id).update({ claimedBy: auth.currentUser.email });
+    if(!auth.currentUser) return alert("Login first");
+    await db.collection('mat_threads').doc(id).update({
+        claimedBy: auth.currentUser.email
+    });
+    addLog(`Claimed material thread: ${id}`);
 }
 
 async function deleteDoc(col, id) {
-    if(confirm("Delete this?")) await db.collection(col).doc(id).delete();
+    if(confirm("Delete this entry?")) {
+        await db.collection(col).doc(id).delete();
+    }
 }
 
+// LOGS
 async function addLog(action) {
     await db.collection('logs').add({ user: auth.currentUser ? auth.currentUser.email : "System", action, date: new Date() });
 }
@@ -293,7 +279,6 @@ async function addLog(action) {
 function loadLogs() {
     db.collection('logs').orderBy('date', 'desc').limit(50).onSnapshot(snap => {
         const list = document.getElementById('log-list');
-        if(!list) return;
         list.innerHTML = '';
         snap.forEach(doc => {
             const d = doc.data();
@@ -308,3 +293,16 @@ function filterLogs() {
         row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none';
     });
 }
+
+auth.onAuthStateChanged(user => {
+    const adminUI = document.querySelectorAll('.admin-only');
+    if (user) {
+        document.getElementById('auth-status').innerHTML = `<button onclick="auth.signOut()">Logout</button>`;
+        if (user.email === ADMIN_EMAIL) adminUI.forEach(el => el.classList.remove('hidden'));
+    } else {
+        document.getElementById('auth-status').innerHTML = `<button onclick="toggleModal('login-modal')">Login</button>`;
+        adminUI.forEach(el => el.classList.add('hidden'));
+    }
+});
+
+loadRoster(); loadFinance(); loadWeed(); loadMats(); loadMatThreads(); loadLogs();
