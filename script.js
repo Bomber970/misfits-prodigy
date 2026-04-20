@@ -5,129 +5,141 @@ const firebaseConfig = {
     storageBucket: "misfits-prodigy.firebasestorage.app",
     messagingSenderId: "70127595002",
     appId: "1:70127595002:web:8f80e65ea8271c92184843"
-};
+}
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+firebase.initializeApp(firebaseConfig)
+const auth = firebase.auth()
+const db = firebase.firestore()
 
-const ADMIN_EMAIL = "bombersnipez@gmail.com";
+const ADMINS = ["bombersnipez@gmail.com", "beans2026@outlook.com"]
+let currentUserName = "Unknown"
+
+function isAdmin(email) {
+    return ADMINS.includes(email)
+}
 
 function getWeekNumber() {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-    const yearStart = new Date(d.getFullYear(), 0, 1);
-    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() + 4 - (d.getDay() || 7))
+    const yearStart = new Date(d.getFullYear(), 0, 1)
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7)
 }
 
 function showSection(id) {
-    document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'));
-    const target = document.getElementById(id);
-    if(target) target.classList.remove('hidden');
-    
+    document.querySelectorAll('.tab-content').forEach(s => s.classList.add('hidden'))
+    const target = document.getElementById(id)
+    if(target) target.classList.remove('hidden')
     if(id === 'history-sec') {
-        const cw = getWeekNumber();
-        document.getElementById('current-week-display').innerText = cw;
-        document.getElementById('history-week-select').value = cw;
-        loadHistoryByWeek();
+        const cw = getWeekNumber()
+        document.getElementById('current-week-display').innerText = cw
+        document.getElementById('history-week-select').value = cw
+        loadHistoryByWeek()
     }
 }
 
 async function handleLogin() {
-    const email = document.getElementById('login-email').value.trim();
-    const pass = document.getElementById('login-pass').value;
+    const email = document.getElementById('login-email').value.trim()
+    const pass = document.getElementById('login-pass').value
     try {
-        await auth.signInWithEmailAndPassword(email, pass);
-    } catch (e) { alert("Login Failed: " + e.message); }
+        await auth.signInWithEmailAndPassword(email, pass)
+    } catch (e) { alert("Login Failed: " + e.message) }
 }
 
-auth.onAuthStateChanged(user => {
-    const loginScreen = document.getElementById('login-screen');
-    const dashboard = document.getElementById('main-dashboard');
-    const authStatus = document.getElementById('auth-status');
-    const adminUI = document.querySelectorAll('.admin-only');
+auth.onAuthStateChanged(async (user) => {
+    const loginScreen = document.getElementById('login-screen')
+    const dashboard = document.getElementById('main-dashboard')
+    const authStatus = document.getElementById('auth-status')
+    const adminUI = document.querySelectorAll('.admin-only')
 
     if (user) {
-        if(loginScreen) loginScreen.classList.add('hidden');
-        if(dashboard) dashboard.classList.remove('hidden');
-        if(authStatus) authStatus.innerHTML = `<span style="font-size:0.8rem; margin-right:10px;">${user.email}</span><button onclick="auth.signOut()">Logout</button>`;
+        const memberSnap = await db.collection('members').where('email', '==', user.email).get()
+        if (!memberSnap.empty) {
+            currentUserName = memberSnap.docs[0].data().name
+        }
+
+        if(loginScreen) loginScreen.classList.add('hidden')
+        if(dashboard) dashboard.classList.remove('hidden')
+        if(authStatus) authStatus.innerHTML = `<span style="font-size:0.8rem; margin-right:10px;">${currentUserName}</span><button onclick="auth.signOut()">Logout</button>`
         
-        if (user.email === ADMIN_EMAIL) {
-            adminUI.forEach(el => el.classList.remove('hidden'));
+        if (isAdmin(user.email)) {
+            adminUI.forEach(el => el.classList.remove('hidden'))
         } else {
-            adminUI.forEach(el => el.classList.add('hidden'));
+            adminUI.forEach(el => el.classList.add('hidden'))
         }
         
-        loadRoster(); loadFinance(); loadWeed(); loadMats(); loadMatThreads(); loadLogs();
+        loadRoster()
+        loadFinance()
+        loadWeed()
+        loadMats()
+        loadMatThreads()
+        loadLogs()
     } else {
-        if(loginScreen) loginScreen.classList.remove('hidden');
-        if(dashboard) dashboard.classList.add('hidden');
+        if(loginScreen) loginScreen.classList.remove('hidden')
+        if(dashboard) dashboard.classList.add('hidden')
     }
-});
+})
 
 async function registerMember() {
-    const name = document.getElementById('new-name').value;
-    const email = document.getElementById('new-email').value;
-    const rank = document.getElementById('new-rank').value;
-    const phone = document.getElementById('new-phone').value;
-    if(!name || !email) return alert("Missing Info");
+    const name = document.getElementById('new-name').value
+    const email = document.getElementById('new-email').value
+    const rank = document.getElementById('new-rank').value
+    const phone = document.getElementById('new-phone').value
+    if(!name || !email) return alert("Missing Info")
     try {
         await db.collection('members').add({
             name, email, rank, phone,
-            debt: 5000, status: 'unpaid',
-            joinedAt: new Date(), proof: "",
-            weekNumber: getWeekNumber()
-        });
-        alert("Member Added.");
-    } catch (e) { alert(e.message); }
+            debt: 5000, status: 'unpaid', joinedAt: new Date(), proof: "", weekNumber: getWeekNumber()
+        })
+        alert("Member Added.")
+    } catch (e) { alert(e.message) }
 }
 
 function loadRoster() {
     db.collection('members').onSnapshot(snap => {
-        const container = document.getElementById('roster-list');
-        if(!container) return;
-        container.innerHTML = '';
+        const container = document.getElementById('roster-list')
+        if(!container) return
+        container.innerHTML = ''
         snap.forEach(doc => {
-            const d = doc.data();
-            const isKaizo = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+            const d = doc.data()
+            const isUserAdmin = auth.currentUser && isAdmin(auth.currentUser.email)
             container.innerHTML += `
                 <div class="card" style="background:var(--panel-bg); padding:20px; border-radius:8px; border-top:3px solid var(--primary-blue);">
                     <h3 style="margin:0;">${d.name}</h3>
                     <p style="color:var(--primary-blue); font-weight:bold; margin:5px 0;">${d.rank.toUpperCase()}</p>
                     <p style="font-size:0.8rem;">Phone: ${d.phone || 'N/A'}</p>
-                    ${isKaizo ? `<button onclick="removeMember('${doc.id}', '${d.name}')" style="background:#c0392b; font-size:0.7rem; margin-top:10px;">Remove</button>` : ''}
-                </div>`;
-        });
-    });
+                    ${isUserAdmin ? `<button onclick="removeMember('${doc.id}', '${d.name}')" style="background:#c0392b; font-size:0.7rem; margin-top:10px;">Remove</button>` : ''}
+                </div>`
+        })
+    })
 }
 
 async function removeMember(id, name) {
-    if(confirm(`Remove ${name}?`)) await db.collection('members').doc(id).delete();
+    if(confirm(`Remove ${name}?`)) await db.collection('members').doc(id).delete()
 }
 
 async function submitPayment() {
-    const proof = document.getElementById('proof-link').value;
-    if(!proof) return alert("Link required");
-    const user = auth.currentUser;
-    const query = await db.collection('members').where('email', '==', user.email).get();
+    const proof = document.getElementById('proof-link').value
+    if(!proof) return alert("Link required")
+    const user = auth.currentUser
+    const query = await db.collection('members').where('email', '==', user.email).get()
     if(!query.empty) {
         await db.collection('members').doc(query.docs[0].id).update({ 
             status: 'verifying', proof, submitDate: new Date(), weekNumber: getWeekNumber() 
-        });
-        alert("Proof Sent.");
+        })
+        alert("Proof Sent.")
     }
 }
 
 function loadFinance() {
-    const currentWeek = getWeekNumber();
+    const currentWeek = getWeekNumber()
     db.collection('members').where('weekNumber', '==', currentWeek).onSnapshot(snap => {
-        const list = document.getElementById('payment-list');
-        if(!list) return;
-        list.innerHTML = '';
+        const list = document.getElementById('payment-list')
+        if(!list) return
+        list.innerHTML = ''
         snap.forEach(doc => {
-            const d = doc.data();
-            let sClass = d.status === 'verifying' ? 'status-orange' : (d.status === 'paid' ? 'status-green' : 'status-red');
+            const d = doc.data()
+            let sClass = d.status === 'verifying' ? 'status-orange' : (d.status === 'paid' ? 'status-green' : 'status-red')
             list.innerHTML += `
                 <tr>
                     <td>${d.name}</td><td>$${d.debt}</td>
@@ -135,42 +147,41 @@ function loadFinance() {
                     <td class="${sClass}">${d.status}</td>
                     <td>${d.submitDate ? d.submitDate.toDate().toLocaleString() : 'N/A'}</td>
                     <td><button onclick="confirmPay('${doc.id}')" style="background:green;">Confirm</button></td>
-                </tr>`;
-        });
-    });
+                </tr>`
+        })
+    })
 }
 
 async function confirmPay(id) {
-    if(auth.currentUser.email !== ADMIN_EMAIL) return;
-    await db.collection('members').doc(id).update({ status: 'paid', debt: 0 });
+    if(!isAdmin(auth.currentUser.email)) return
+    await db.collection('members').doc(id).update({ status: 'paid', debt: 0 })
 }
 
 async function resetFinanceWeek() {
-    if(auth.currentUser.email !== ADMIN_EMAIL) return;
-    if(!confirm("Reset for new week?")) return;
-    const newWeek = getWeekNumber();
-    const snap = await db.collection('members').get();
-    const batch = db.batch();
+    if(!isAdmin(auth.currentUser.email)) return
+    if(!confirm("Reset for new week?")) return
+    const newWeek = getWeekNumber()
+    const snap = await db.collection('members').get()
+    const batch = db.batch()
     snap.forEach(doc => {
         batch.update(doc.ref, { 
             status: 'unpaid', proof: "", debt: (doc.data().debt || 0) + 5000,
             weekNumber: newWeek, submitDate: null
-        });
-    });
-    await batch.commit();
-    alert("Week Reset.");
+        })
+    })
+    await batch.commit()
 }
 
 async function loadHistoryByWeek() {
-    const week = parseInt(document.getElementById('history-week-select').value);
-    const snap = await db.collection('members').where('weekNumber', '==', week).get();
-    const list = document.getElementById('history-list');
-    if(!list) return;
-    list.innerHTML = '';
+    const week = parseInt(document.getElementById('history-week-select').value)
+    const snap = await db.collection('members').where('weekNumber', '==', week).get()
+    const list = document.getElementById('history-list')
+    if(!list) return
+    list.innerHTML = ''
     snap.forEach(doc => {
-        const d = doc.data();
-        list.innerHTML += `<tr><td>${d.name}</td><td>$${d.debt}</td><td>${d.status}</td><td>${d.submitDate ? d.submitDate.toDate().toLocaleDateString() : 'N/A'}</td></tr>`;
-    });
+        const d = doc.data()
+        list.innerHTML += `<tr><td>${d.name}</td><td>$${d.debt}</td><td>${d.status}</td><td>${d.submitDate ? d.submitDate.toDate().toLocaleDateString() : 'N/A'}</td></tr>`
+    })
 }
 
 async function logWeed(type) {
@@ -180,130 +191,156 @@ async function logWeed(type) {
         amount: document.getElementById('weed-amount').value,
         lace: document.getElementById('weed-lace').value,
         buyer: document.getElementById('weed-buyer').value || "Stock",
-        type, date: new Date(), user: auth.currentUser.email
-    };
-    await db.collection('weed_logs').add(data);
+        type, date: new Date(), user: currentUserName
+    }
+    await db.collection('weed_logs').add(data)
 }
 
 function loadWeed() {
     db.collection('weed_logs').orderBy('date', 'desc').onSnapshot(snap => {
-        const list = document.getElementById('weed-list');
-        if(!list) return;
-        list.innerHTML = '';
+        const list = document.getElementById('weed-list')
+        if(!list) return
+        list.innerHTML = ''
         snap.forEach(doc => {
-            const d = doc.data();
-            list.innerHTML += `<tr><td>${d.strain}</td><td>${d.zone}</td><td>${d.amount}</td><td>${d.lace}</td><td>${d.buyer}</td><td>${d.date.toDate().toLocaleDateString()}</td></tr>`;
-        });
-    });
+            const d = doc.data()
+            list.innerHTML += `<tr><td>${d.strain}</td><td>${d.zone}</td><td>${d.amount}</td><td>${d.lace}</td><td>${d.buyer}</td><td>${d.date.toDate().toLocaleDateString()}</td></tr>`
+        })
+    })
 }
 
-// MATERIALS FIX
 async function updateMaterials() {
-    try {
-        const name = document.getElementById('mat-name').value;
-        const qty = document.getElementById('mat-qty').value;
-        const loc = document.getElementById('mat-loc').value;
-        if(!name || !qty || !loc) return alert("Fill all inventory fields");
-
-        await db.collection('materials').add({
-            name: name,
-            qty: Number(qty),
-            loc: loc,
-            updated: new Date()
-        });
-        
-        document.getElementById('mat-name').value = '';
-        document.getElementById('mat-qty').value = '';
-        document.getElementById('mat-loc').value = '';
-        alert("Stock Updated!");
-    } catch (e) {
-        alert("Error saving materials: " + e.message);
-    }
+    const name = document.getElementById('mat-name').value
+    const qty = document.getElementById('mat-qty').value
+    const loc = document.getElementById('mat-loc').value
+    if(!name || !qty || !loc) return alert("Fill all inventory fields")
+    await db.collection('materials').add({ name, qty: Number(qty), loc, updated: new Date() })
+    document.getElementById('mat-name').value = ''
+    document.getElementById('mat-qty').value = ''
+    document.getElementById('mat-loc').value = ''
 }
 
 function loadMats() {
     db.collection('materials').orderBy('updated', 'desc').onSnapshot(snap => {
-        const list = document.getElementById('mats-list');
-        if(!list) return;
-        list.innerHTML = '';
+        const list = document.getElementById('mats-list')
+        if(!list) return
+        list.innerHTML = ''
         snap.forEach(doc => {
-            const d = doc.data();
-            const isKaizo = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
+            const d = doc.data()
+            const isUserAdmin = auth.currentUser && isAdmin(auth.currentUser.email)
             list.innerHTML += `<tr>
                 <td>${d.name}</td><td>${d.qty}</td><td>${d.loc}</td>
-                <td>${isKaizo ? `<button onclick="deleteDoc('materials', '${doc.id}')" style="background:red;">X</button>` : ''}</td>
-            </tr>`;
-        });
-    });
+                <td>${isUserAdmin ? `<button onclick="deleteDoc('materials', '${doc.id}')" style="background:red;">X</button>` : ''}</td>
+            </tr>`
+        })
+    })
 }
 
 async function createMatThread() {
-    try {
-        const item = document.getElementById('thread-item').value;
-        if(!item) return alert("Type what is needed first");
-        
-        await db.collection('mat_threads').add({ 
-            item: item, 
-            claimedBy: null, 
-            postedAt: new Date() 
-        });
-        
-        document.getElementById('thread-item').value = '';
-        alert("Thread Posted!");
-    } catch (e) {
-        alert("Error creating thread: " + e.message);
-    }
+    const item = document.getElementById('thread-item').value
+    if(!item) return alert("What is needed?")
+    await db.collection('mat_threads').add({ 
+        item, 
+        claims: [], 
+        isLocked: false, 
+        postedAt: new Date() 
+    })
+    document.getElementById('thread-item').value = ''
 }
 
 function loadMatThreads() {
     db.collection('mat_threads').orderBy('postedAt', 'desc').onSnapshot(snap => {
-        const container = document.getElementById('mats-threads-container');
-        if(!container) return;
-        container.innerHTML = '';
+        const container = document.getElementById('mats-threads-container')
+        if(!container) return
+        container.innerHTML = ''
         snap.forEach(doc => {
-            const d = doc.data();
-            const isKaizo = auth.currentUser && auth.currentUser.email === ADMIN_EMAIL;
-            const isClaimed = d.claimedBy !== null;
+            const d = doc.data()
+            const isUserAdmin = auth.currentUser && isAdmin(auth.currentUser.email)
+            const isLocked = d.isLocked === true
+            
+            let claimsHtml = ''
+            d.claims.forEach((c, index) => {
+                claimsHtml += `
+                    <div class="claim-item">
+                        <span>${c.user}: <strong>${c.amount}</strong> ${c.full ? '(Full)' : ''}</span>
+                        ${isUserAdmin ? `<button onclick="removeClaim('${doc.id}', ${index})" style="background:none; color:red; padding:0; border:none; cursor:pointer;">[Remove]</button>` : ''}
+                    </div>`
+            })
+
             container.innerHTML += `
-                <div class="thread-card ${isClaimed ? 'claimed' : ''}">
-                    <h4 style="margin:0;">${d.item}</h4>
-                    <p style="font-size:0.8rem; color:#888;">${isClaimed ? `Claimed by: ${d.claimedBy}` : 'Unclaimed'}</p>
-                    ${!isClaimed ? `<button onclick="claimThread('${doc.id}')" style="background:green; font-size:0.7rem; margin-top:5px;">Claim It</button>` : ''}
-                    ${isKaizo ? `<button onclick="deleteDoc('mat_threads', '${doc.id}')" style="background:red; font-size:0.7rem; margin-top:5px; margin-left:5px;">Delete</button>` : ''}
-                </div>`;
-        });
-    });
+                <div class="thread-card ${isLocked ? 'locked' : ''}">
+                    <h4 style="margin:0;">${d.item} ${isLocked ? '✅' : ''}</h4>
+                    <div class="claim-list">${claimsHtml || 'No claims yet.'}</div>
+                    
+                    ${!isLocked ? `
+                        <div class="claim-input-group">
+                            <input type="number" id="amt-${doc.id}" placeholder="Qty">
+                            <label style="font-size:0.7rem;"><input type="checkbox" id="full-${doc.id}"> Full</label>
+                            <button onclick="claimPartial('${doc.id}')" style="font-size:0.7rem; padding:5px;">Claim</button>
+                        </div>
+                    ` : '<p style="color:var(--status-green); font-size:0.8rem; margin-top:10px;">Fully Claimed / Closed</p>'}
+                    
+                    ${isUserAdmin ? `
+                        <button onclick="deleteDoc('mat_threads', '${doc.id}')" style="background:red; font-size:0.7rem; position:absolute; top:10px; right:10px;">Delete</button>
+                    ` : ''}
+                </div>`
+        })
+    })
 }
 
-async function claimThread(id) {
-    if(!auth.currentUser) return;
-    await db.collection('mat_threads').doc(id).update({ claimedBy: auth.currentUser.email });
+async function claimPartial(id) {
+    const amount = document.getElementById(`amt-${id}`).value
+    const isFull = document.getElementById(`full-${id}`).checked
+    if(!amount && !isFull) return alert("Enter amount or check Full Claim")
+
+    const threadRef = db.collection('mat_threads').doc(id)
+    const snap = await threadRef.get()
+    const currentClaims = snap.data().claims || []
+
+    currentClaims.push({
+        user: currentUserName,
+        amount: amount || "All",
+        full: isFull
+    })
+
+    await threadRef.update({
+        claims: currentClaims,
+        isLocked: isFull
+    })
+}
+
+async function removeClaim(threadId, claimIndex) {
+    if(!isAdmin(auth.currentUser.email)) return
+    const threadRef = db.collection('mat_threads').doc(threadId)
+    const snap = await threadRef.get()
+    let currentClaims = snap.data().claims
+    currentClaims.splice(claimIndex, 1)
+    await threadRef.update({ claims: currentClaims, isLocked: false })
 }
 
 async function deleteDoc(col, id) {
-    if(confirm("Delete this?")) await db.collection(col).doc(id).delete();
+    if(confirm("Delete this?")) await db.collection(col).doc(id).delete()
 }
 
 async function addLog(action) {
-    if(!auth.currentUser) return;
-    await db.collection('logs').add({ user: auth.currentUser.email, action, date: new Date() });
+    if(!auth.currentUser) return
+    await db.collection('logs').add({ user: currentUserName, action, date: new Date() })
 }
 
 function loadLogs() {
     db.collection('logs').orderBy('date', 'desc').limit(50).onSnapshot(snap => {
-        const list = document.getElementById('log-list');
-        if(!list) return;
-        list.innerHTML = '';
+        const list = document.getElementById('log-list')
+        if(!list) return
+        list.innerHTML = ''
         snap.forEach(doc => {
-            const d = doc.data();
-            list.innerHTML += `<tr><td>${d.user}</td><td>${d.action}</td><td>${d.date.toDate().toLocaleString()}</td></tr>`;
-        });
-    });
+            const d = doc.data()
+            list.innerHTML += `<tr><td>${d.user}</td><td>${d.action}</td><td>${d.date.toDate().toLocaleString()}</td></tr>`
+        })
+    })
 }
 
 function filterLogs() {
-    const val = document.getElementById('log-search').value.toLowerCase();
+    const val = document.getElementById('log-search').value.toLowerCase()
     document.querySelectorAll('#log-list tr').forEach(row => {
-        row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none';
-    });
+        row.style.display = row.innerText.toLowerCase().includes(val) ? '' : 'none'
+    })
 }
