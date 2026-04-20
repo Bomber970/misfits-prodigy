@@ -56,6 +56,8 @@ auth.onAuthStateChanged(async (user) => {
         const memberSnap = await db.collection('members').where('email', '==', user.email).get()
         if (!memberSnap.empty) {
             currentUserName = memberSnap.docs[0].data().name
+        } else {
+            currentUserName = user.email.split('@')[0]
         }
 
         if(loginScreen) loginScreen.classList.add('hidden')
@@ -288,8 +290,11 @@ function loadMatThreads() {
 }
 
 async function claimPartial(id) {
-    const amount = document.getElementById(`amt-${id}`).value
-    const isFull = document.getElementById(`full-${id}`).checked
+    const amountInput = document.getElementById(`amt-${id}`)
+    const fullCheckbox = document.getElementById(`full-${id}`)
+    const amount = amountInput.value
+    const isFull = fullCheckbox.checked
+
     if(!amount && !isFull) return alert("Enter amount or check Full Claim")
 
     const threadRef = db.collection('mat_threads').doc(id)
