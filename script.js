@@ -231,11 +231,13 @@ async function updateMaterials() {
     const name = document.getElementById('mat-name').value
     const qty = document.getElementById('mat-qty').value
     const loc = document.getElementById('mat-loc').value
-    if(!name || !qty || !loc) return alert("Fill all inventory fields")
-    await db.collection('materials').add({ name, qty: Number(qty), loc, updated: new Date() })
+    const broughtBy = document.getElementById('mat-brought-by').value
+    if(!name || !qty || !loc || !broughtBy) return alert("Fill all inventory fields including who brought it")
+    await db.collection('materials').add({ name, qty: Number(qty), loc, broughtBy, updated: new Date() })
     document.getElementById('mat-name').value = ''
     document.getElementById('mat-qty').value = ''
     document.getElementById('mat-loc').value = ''
+    document.getElementById('mat-brought-by').value = ''
 }
 
 function loadMats() {
@@ -247,7 +249,7 @@ function loadMats() {
             const d = doc.data()
             const isUserAdmin = auth.currentUser && isMatsAdmin(auth.currentUser.email)
             list.innerHTML += `<tr>
-                <td>${d.name}</td><td>${d.qty}</td><td>${d.loc}</td>
+                <td>${d.name}</td><td>${d.qty}</td><td>${d.loc}</td><td>${d.broughtBy || 'N/A'}</td>
                 <td>${isUserAdmin ? `<button onclick="deleteDoc('materials', '${doc.id}')" style="background:red;">X</button>` : ''}</td>
             </tr>`
         })
