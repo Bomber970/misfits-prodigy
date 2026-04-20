@@ -11,11 +11,17 @@ firebase.initializeApp(firebaseConfig)
 const auth = firebase.auth()
 const db = firebase.firestore()
 
-const ADMINS = ["bombersnipez@gmail.com", "beans2026@outlook.com"]
+const FULL_ADMINS = ["bombersnipez@gmail.com"]
+const MATS_ADMINS = ["bombersnipez@gmail.com", "beans2026@outlook.com"]
+
 let currentUserName = "Unknown"
 
-function isAdmin(email) {
-    return ADMINS.includes(email)
+function isFullAdmin(email) {
+    return FULL_ADMINS.includes(email)
+}
+
+function isMatsAdmin(email) {
+    return MATS_ADMINS.includes(email)
 }
 
 function getWeekNumber() {
@@ -51,23 +57,34 @@ auth.onAuthStateChanged(async (user) => {
     const dashboard = document.getElementById('main-dashboard')
     const authStatus = document.getElementById('auth-status')
     const adminUI = document.querySelectorAll('.admin-only')
+    const matsAdminUI = document.querySelectorAll('.mats-admin-only')
 
     if (user) {
-        const memberSnap = await db.collection('members').where('email', '==', user.email).get()
-        if (!memberSnap.empty) {
-            currentUserName = memberSnap.docs[0].data().name
+        if (user.email === "beans2026@outlook.com") {
+            currentUserName = "Bertha"
         } else {
-            currentUserName = user.email.split('@')[0]
+            const memberSnap = await db.collection('members').where('email', '==', user.email).get()
+            if (!memberSnap.empty) {
+                currentUserName = memberSnap.docs[0].data().name
+            } else {
+                currentUserName = user.email.split('@')[0]
+            }
         }
 
         if(loginScreen) loginScreen.classList.add('hidden')
         if(dashboard) dashboard.classList.remove('hidden')
         if(authStatus) authStatus.innerHTML = `<span style="font-size:0.8rem; margin-right:10px;">${currentUserName}</span><button onclick="auth.signOut()">Logout</button>`
         
-        if (isAdmin(user.email)) {
+        if (isFullAdmin(user.email)) {
             adminUI.forEach(el => el.classList.remove('hidden'))
         } else {
             adminUI.forEach(el => el.classList.add('hidden'))
+        }
+
+        if (isMatsAdmin(user.email)) {
+            matsAdminUI.forEach(el => el.classList.remove('hidden'))
+        } else {
+            matsAdminUI.forEach(el => el.classList.add('hidden'))
         }
         
         loadRoster()
@@ -104,7 +121,7 @@ function loadRoster() {
         container.innerHTML = ''
         snap.forEach(doc => {
             const d = doc.data()
-            const isUserAdmin = auth.currentUser && isAdmin(auth.currentUser.email)
+            const isUserAdmin = auth.currentUser && isFullAdmin(auth.currentUser.email)
             container.innerHTML += `
                 <div class="card" style="background:var(--panel-bg); padding:20px; border-radius:8px; border-top:3px solid var(--primary-blue);">
                     <h3 style="margin:0;">${d.name}</h3>
@@ -155,12 +172,12 @@ function loadFinance() {
 }
 
 async function confirmPay(id) {
-    if(!isAdmin(auth.currentUser.email)) return
+    if(!isFullAdmin(auth.currentUser.email)) return
     await db.collection('members').doc(id).update({ status: 'paid', debt: 0 })
 }
 
 async function resetFinanceWeek() {
-    if(!isAdmin(auth.currentUser.email)) return
+    if(!isFullAdmin(auth.currentUser.email)) return
     if(!confirm("Reset for new week?")) return
     const newWeek = getWeekNumber()
     const snap = await db.collection('members').get()
@@ -228,7 +245,7 @@ function loadMats() {
         list.innerHTML = ''
         snap.forEach(doc => {
             const d = doc.data()
-            const isUserAdmin = auth.currentUser && isAdmin(auth.currentUser.email)
+            const isUserAdmin = auth.currentUser && isMatsAdmin(auth.currentUser.email)
             list.innerHTML += `<tr>
                 <td>${d.name}</td><td>${d.qty}</td><td>${d.loc}</td>
                 <td>${isUserAdmin ? `<button onclick="deleteDoc('materials', '${doc.id}')" style="background:red;">X</button>` : ''}</td>
@@ -256,7 +273,7 @@ function loadMatThreads() {
         container.innerHTML = ''
         snap.forEach(doc => {
             const d = doc.data()
-            const isUserAdmin = auth.currentUser && isAdmin(auth.currentUser.email)
+            const isUserAdmin = auth.currentUser && isMatsAdmin(auth.currentUser.email)
             const isLocked = d.isLocked === true
             
             let claimsHtml = ''
@@ -314,7 +331,7 @@ async function claimPartial(id) {
 }
 
 async function removeClaim(threadId, claimIndex) {
-    if(!isAdmin(auth.currentUser.email)) return
+    if(!isMatsAdmin(auth.currentUser.email)) return
     const threadRef = db.collection('mat_threads').doc(threadId)
     const snap = await threadRef.get()
     let currentClaims = snap.data().claims
